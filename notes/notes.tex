@@ -1,0 +1,92 @@
+\documentclass{article}
+\include{preamble}
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}
+
+\author{Giovanni Diana}
+\title{Notes on spike inference}
+\begin{document}
+
+\maketitle
+
+\section{The model}
+\begin{align}
+    &\left\lbrace\begin{array}{clc} 
+        c_t =& \gamma c_{t-1} + A s_t,& \mathrm{for}\; t=T,T-1,\cdots,2\\
+        c_1 =& c_0 + A s_1 &
+    \end{array}\right.\\
+    &\quad y_t \sim \mathcal{N}(c_t+b,\sigma^2)\\
+    &\quad s_t \sim \mathrm{Bernoulli}(\pi)
+\end{align}
+
+For the prior distributions we have
+\begin{align}
+    \bm{\theta}&\equiv\lbrace A,b,c_0\rbrace \sim \mathcal{N}(\bm{\mu},\bm{\Sigma})\\
+    \sigma^2 &\sim \mathrm{InvGamma}(\alpha_\sigma,\beta_\sigma)\\
+    \pi&\sim \mathrm{beta}(\alpha_\pi,\beta_\pi)
+\end{align}
+
+\begin{tcolorbox}
+    \begin{remark}
+Note that the empirical Bayes approach described in the arXiv version of the paper is wrong. 
+The marginal likelihood $p(\bm{s}|\alpha,\beta)$ reads
+\begin{align}
+    p(\bm{s}|\alpha,\beta)=\frac{\alpha^{[n]}\beta^{[T-n]}}{(\alpha+\beta)^{[T]}}
+\end{align}
+where $n$ is the number of spikes in $\bm{s}$ and we used the ascending power notation
+\begin{align}
+    x^{[n]} = x\cdot (x+1)\cdots (x+n-1)
+\end{align}
+The mistake in the arXiv version of Pnevmatikakis 2013 is to replace ascending powers with regular powers, leading to the wrong concusion that the marginal likelihood $p(\bm{s}|\alpha,\beta)$ only depends on the ratio $\alpha/\beta$. This was fixed in the conference version.
+    \end{remark}
+\end{tcolorbox}
+Given the spike train $\bm{s}$ and the parameters $\gamma$ and $A$, we can obtain a close-form expression for the calcium at any time $c_t$. 
+Note that at $t=2$ we have 
+\begin{align}
+    c_2=\gamma c_1 +As_1 = \gamma c_0 + A(\gamma s_1 + s_2)
+\end{align}
+Multiplying by $\gamma$ and adding $A s_3$ leads to
+\begin{align}
+    c_3=\gamma^2 c_0 + A(\gamma^2 s_1+\gamma s_2 +\gamma s_3)
+\end{align}
+which generalizes to the equation
+\begin{align}
+    c_t = \gamma^{t-1}c_0 + A\sum_{k=1}^{t} \gamma^{t-k}s_k
+\end{align}
+
+By defining the matrix
+\begin{align}
+    \tilde G_{tk} = \left\lbrace\begin{array}{c c}
+        \gamma^{t-k} & k\le t\\
+        0 & \mathrm{otherwise}
+    \end{array}\right.
+\end{align}
+and the vector $\bm{v} \equiv \lbrace 1,\gamma,\gamma^2,\cdots,\gamma^{T-1}\rbrace$ 
+we can rewrite the calcium in matrix form
+\begin{align}
+    \bm{c} = c_0 \bm{v} + A \bm{\tilde G}\cdot \bm{s}
+\end{align}
+
+\section{Likelihood, joint probability and full conditionals}
+\subsection{Likelihood}
+The data likelihood can be expressed as
+\begin{align}
+    P(\bm{y} | \bm{s}, \bm{\theta},\sigma) = (2\pi\sigma^2)^{T/2}\cdot \exp\left[-\frac{1}{2\sigma^2}(\bm{y}-b\bm{1} - c_0 \bm{v}-A\bm{\tilde G}\cdot \bm{s})^2\right]
+\end{align}
+where $\bm{1}\equiv \lbrace 1,1,\cdots,1\rbrace$. 
+
+\subsection{Joint probability}
+The joint probability (probability of everything) is
+\begin{align}
+    P(\bm{y},\bm{s},\bm{\theta},\sigma^2) =& \mathrm{beta}(\pi; \alpha_\pi,\beta_\pi)\cdot \mathrm{InvGamma}(\sigma^2;\alpha_\sigma,\beta_\sigma)\cdot \mathcal{N}(\bm{\theta};\bm{\mu},\bm{\Sigma})\nonumber\\
+    &\pi^{N_{\bm{s}}}(1-\pi)^{T-N_{\bm{s}}}\cdot (2\pi\sigma^2)^{T/2}\cdot \exp\left[-\frac{1}{2\sigma^2}(\bm{y}-b\bm{1} - c_0 \bm{v}-A\bm{\tilde G}\cdot \bm{s})^2\right]
+\end{align}
+where $N_{\bm{s}}$ is the number of spikes in the vector $\bm{s}$.
+\subsection{Full conditionals}
+Let's consider the probability of the spike vector $\bm{s}$ conditional to everything else. The general trick to calculate full conditionals is tolook at the joint probability and only keep factors that depend on the argument of the conditional. We can deal later with the normalization factor if we need to (alternatively we can use the Metropolis rejection method to sample from unnormalized distributions). In the case of $\bm{s}$, by expanding the square in the exponential and keeping only terms that depend on $\bm{s}$ we obtain
+\begin{align}
+    P(\bm{s}|\bm{y},\bm{\theta},\sigma^2) \propto \exp\left[-\frac{A^2}{2\sigma^2}\bm{s}^T\bm{\tilde G}^T\bm{\tilde G}\cdot \bm{s}+\frac{A}{\sigma^2}\bm{s}^T\bm{\tilde G}^T\cdot\bm{\tilde y}+N_{\bm{s}}\log\frac{\pi}{1-\pi}\right]
+\end{align}
+where $\bm{\tilde y}=y-b\bm{1}-c_0\bm{v}$. 
+\end{document}
+
