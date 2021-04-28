@@ -8,7 +8,26 @@
 \begin{document}
 
 \maketitle
-
+\section{Probability distributions}
+\begin{itemize}
+    \item {\bf Multivariate normal distribution}:
+        \begin{align}
+            \mathcal{N}(\bm{x};\bm\mu,\bm\Sigma)\equiv \frac{1}{(2\pi\det\bm\Sigma)^{d/2}}\exp\left[-\frac{1}{2}(\bm x-\bm\mu)^T\bm\Sigma^{-1}(\bm x-\bm\mu)\right]
+        \end{align}
+    \item {\bf Beta distribution}
+        \begin{align}
+            \mathrm{beta}(x;\alpha,\beta)\equiv \frac{x^{\alpha-1}(1-x)^{\beta-1}}{\mathrm{B}(\alpha,\beta)}
+        \end{align}
+        where 
+        \begin{align}
+            \mathrm{B}(\alpha,\beta)=\frac{\Gamma(\alpha)\Gamma(\beta)}{\Gamma(\alpha+\beta)}
+        \end{align}
+        and $\Gamma$ is the Gamma function.
+    \item {\bf Inverse Gamma distribution}
+        \begin{align}
+            \mathrm{InvGamma}(x;\alpha,\beta)\equiv \frac{\beta^\alpha}{\Gamma(\alpha)} x^{-\alpha-1}\exp\left(-\frac{\beta}{x}\right)
+        \end{align}
+\end{itemize}
 \section{The model}
 \begin{align}
     &\left\lbrace\begin{array}{clc} 
@@ -16,16 +35,16 @@
         c_1 =& c_0 + A s_1 &
     \end{array}\right.\\
     &\quad y_t \sim \mathcal{N}(c_t+b,\sigma^2)\\
-    &\quad s_t \sim \mathrm{Bernoulli}(\pi)
+    &\quad s_t \sim \mathrm{Bernoulli}(q)
 \end{align}
 
 For the prior distributions we have
 \begin{align}
     \bm{\theta}&\equiv\lbrace A,b,c_0\rbrace \sim \mathcal{N}(\bm{\mu},\bm{\Sigma})\\
     \sigma^2 &\sim \mathrm{InvGamma}(\alpha_\sigma,\beta_\sigma)\\
-    \pi&\sim \mathrm{beta}(\alpha_\pi,\beta_\pi)
+    q&\sim \mathrm{beta}(\alpha_q,\beta_q)
 \end{align}
-
+note that in Pnevmatikakis 2013 $\alpha_\sigma=1$ and $\beta_\sigma=0.1$.
 \begin{tcolorbox}
     \begin{remark}
 Note that the empirical Bayes approach described in the arXiv version of the paper is wrong. 
@@ -78,17 +97,88 @@ where $\bm{1}\equiv \lbrace 1,1,\cdots,1\rbrace$.
 \subsection{Joint probability}
 The joint probability (probability of everything) is
 \begin{align}
-    P(\bm{y},\bm{s},\bm{\theta},\sigma^2) =& \mathrm{beta}(\pi; \alpha_\pi,\beta_\pi)\cdot \mathrm{InvGamma}(\sigma^2;\alpha_\sigma,\beta_\sigma)\cdot \mathcal{N}(\bm{\theta};\bm{\mu},\bm{\Sigma})\nonumber\\
-    &\pi^{N_{\bm{s}}}(1-\pi)^{T-N_{\bm{s}}}\cdot (2\pi\sigma^2)^{T/2}\cdot \exp\left[-\frac{1}{2\sigma^2}(\bm{y}-b\bm{1} - c_0 \bm{v}-A\bm{\tilde G}\cdot \bm{s})^2\right]
+    P(\bm{y},\bm{s},\bm{\theta},\sigma^2) =& \mathrm{beta}(q; \alpha_q,\beta_q)\cdot \mathrm{InvGamma}(\sigma^2;\alpha_\sigma,\beta_\sigma)\cdot \mathcal{N}(\bm{\theta};\bm{\mu},\bm{\Sigma})\nonumber\\
+    &q^{N_{\bm{s}}}(1-q)^{T-N_{\bm{s}}}\cdot (2\pi\sigma^2)^{T/2}\cdot \exp\left[-\frac{1}{2\sigma^2}(\bm{y}-b\bm{1} - c_0 \bm{v}-A\bm{\tilde G}\cdot \bm{s})^2\right]\label{eq:joint}
 \end{align}
 where $N_{\bm{s}}$ is the number of spikes in the vector $\bm{s}$.
 \subsection{Full conditionals}
 Let's consider the probability of the spike vector $\bm{s}$ conditional to everything else. The general trick to calculate full conditionals is tolook at the joint probability and only keep factors that depend on the argument of the conditional. We can deal later with the normalization factor if we need to (alternatively we can use the Metropolis rejection method to sample from unnormalized distributions). In the case of $\bm{s}$, by expanding the square in the exponential and keeping only terms that depend on $\bm{s}$ we obtain
 \begin{align}
-    P(\bm{s}|\bm{y},\bm{\theta},\sigma^2) \propto \exp\left[-\frac{A^2}{2\sigma^2}\bm{s}^T\bm{\tilde G}^T\bm{\tilde G}\cdot \bm{s}+\frac{A}{\sigma^2}\bm{s}^T\bm{\tilde G}^T\cdot\bm{\tilde y}+N_{\bm{s}}\log\frac{\pi}{1-\pi}\right]
+    P(\bm{s}|\bm{y},\bm{\theta},\sigma^2) \propto \exp\left[-\frac{A^2}{2\sigma^2}\bm{s}^T\bm{\tilde G}^T\bm{\tilde G}\cdot \bm{s}+\frac{A}{\sigma^2}\bm{s}^T\bm{\tilde G}^T\cdot\bm{\tilde y}+N_{\bm{s}}\log\frac{q}{1-q}\right] \label{eq:fc_s}
 \end{align}
 where $\bm{\tilde y}=y-b\bm{1}-c_0\bm{v}$. 
 
-For this type of distribution the normalization factor is not
+Note that for this type of distribution the normalization factor cannot be obtained analytically. To sample the spikes we will need to introduce a Metropolis-Hastings acceptance rule. Let's derive first the remaining conditionals. The full conditional of the model parameters $\bm{\theta}$ is obtained by keeping factors from the joint probability (Eq.~(\ref{eq:joint})) which only depend on $\bm{\theta}$:
+\begin{align}
+    P(\bm{\theta} | \bm{s},\sigma^2,\bm{y}) &\propto \exp\left[-\frac{1}{2} (\bm{\theta}-\bm{\mu})^T(\bm\Sigma)^{-1}(\bm\theta-\bm\mu)-\frac{1}{2\sigma^2}(\bm y-\bm S \bm\theta)^2\right] \label{eq:theta_1}
+\end{align}
+where we introduced the $T\times3$ matrix $\bm S$ 
+\begin{align}
+    \bm S = (A\bm{\tilde G}\cdot\bm{s},\bm{1},\bm v).
+\end{align}
+This notation exploits the linearity of the residual $\bm{y}-b\bm{1} - c_0 \bm{v}-A\bm{\tilde G}\cdot \bm{s}$ with respect to $A$, $b$ and $c_0$.
+The quadratic form in the exponential of Eq.~(\ref{eq:theta_1}) implies that the full conditional will be a multivariate normal distribution $\mathcal{N}(\bm\mu',\bm\Lambda)$. We can determine the covariance matrix $\bm\Lambda$ from the quadratic term in $\bm\theta$
+\begin{align}
+    \bm{\Lambda}^{-1} = \bm{\Sigma}^{-1}+\frac{1}{\sigma^2}\bm{S}^T \bm{S}
+\end{align}
+The mean vector $\bm\mu'$ can be obtained by matching the linear terms in the exponent of the conditional ($\bm\theta^T(\bm\Lambda)^{-1}\bm\mu'i/2$) with the linear in Eq.~(\ref{eq:theta_1}) proportional to $\bm\theta^T$
+\begin{align}
+    \frac{1}{2}\bm\theta^T(\bm\Lambda)^{-1}\bm\mu' = \frac{1}{2}\bm\theta^T(\bm\Sigma)^{-1}\bm\mu+\frac{1}{2\sigma^2}\bm{\theta}^T\bm{S}^T\bm{y}
+\end{align}
+therefore we have
+\begin{align}
+    \bm\mu'=\bm\Lambda\left(\bm\Sigma^{-1}\bm\mu+\frac{1}{\sigma^2}\bm{S}^T\bm{y}\right)
+\end{align}
+\begin{tcolorbox}
+    \begin{remark}
+    Note that in the conference version of Pnevmatikakis 2013 there is a typo in the mean of this conditional distribution. The typo is not present in the arXiv version.
+    \end{remark}
+\end{tcolorbox}
+Let us now obtain the full conditional on the noise variance $\sigma^2$. By keeping terms from the joint distribution only dependent on $\sigma^2$ (residual from the exponential of the likelihood and the prior)
+\begin{align}
+    P(\sigma^2| \bm{s},\bm{y},\bm\theta) \propto (\sigma^2)^{-\alpha_\sigma-1}e^{-\beta_\sigma/\sigma^2}\cdot (2\pi\sigma^2)^{-T/2}\exp\left[-\frac{1}{2\sigma^2}(\bm y-\bm{S\theta})^2\right] 
+\end{align}
+which is an $\mathrm{InvGamma}$ with parameters
+\begin{align}
+    \alpha'_{\sigma} &= \alpha_\sigma+T/2\\
+    \beta'_\sigma &= \beta_\sigma+\frac{1}{2}(\bm y - \bm{S\theta})^2
+\end{align}
+Finally by keeping terms from the joint that only depend on $q$ we obtain the conditional
+\begin{align}
+    P(q|\cdots) = \mathrm{beta}(q;\alpha_q',\beta_q')
+\end{align}
+with 
+\begin{align}
+    \alpha'_q &= \alpha_q+N_{\bm{s}}\\
+    \beta'_q &=\beta_q+(T-N_{\bm{s}})
+\end{align}
+In practice, when $T$ and $N_{\bm s}$ are large, we can simply set $q$ to its maximum-likelihood value $q_\mathrm{MLE}\equiv N_{\bm s}/T$.
+
+\section{Sampling}
+According to the above construction, it is easy to sample model parameters as the full conditional distributions are known distributions. In order to sample the binary vector $\bm s$ representing the presence of a spike in each time bin we need to use the Metropolis-Hastings acceptance rule, which corresponds to flip one element of $\bm s$ at a time and accept the move with probability
+\begin{align}
+    \alpha_{MH} =\min\left(1,\frac{\mathrm{Prob(flip)}}{\mathrm{Prob(orig)}}\right)\label{eq:MH_1}
+\end{align}
+for a given element $s_t$ we can compute the log of the ratio in Eq.~(\ref{eq:MH_1}) using the full conditional derived in Eq.~(\ref{eq:fc_s})
+\begin{align}
+    \log\frac{P(\bm{s}_\mathrm{flip}|\cdots)}{P(\bm{s}_\mathrm{orig}|\cdots)}
+\end{align}
+the first contribution to the log ratio is of the form
+\begin{align}
+    \bm s^T \bm{W} \bm{s}|_\mathrm{flip} - \bm s^T \bm{W} \bm{s}|_\mathrm{orig} =& \sum_{i,j} W_{ij}s_i s_j|_\mathrm{flip} - \sum_{i,j} W_{ij}s_i s_j|_\mathrm{orig}
+\end{align}
+Where $\bm W=A^2\bm{\tilde G}^T\bm{\tilde G}/\sigma^2$ is a symmetric matrix. If we flip the value of $\sigma_t$ to $\sigma_t'$ the terms contributing to the difference between flipped and original correspond to instances of $i=t$ or $j=t$ (or both). We can simplify the difference as
+\begin{align}
+    (1-2s_t)\left[\underbrace{\sum_{j} (W_{tj} s_j +W_{jt} s_j) - 2W_{tt}s_t}_{j\neq t}+\underbrace{W_{tt}}_{j=t}\right]= (1-2s_t)\left[\sum_{j} 2W_{tj} s_j  + (1-2s_t) W_{tt}\right]
+\end{align}
+Then we have a second contribution of the form 
+\begin{align}
+    \bm{s}^T\cdot \bm z|_\mathrm{flip}-\bm{s}^T\cdot \bm z|_\mathrm{orig}= (1-2s_t) z_i
+\end{align}
+By combining the two types of contributions we obtain
+\begin{align}
+    \log\frac{P(\bm{s}_\mathrm{flip}|\cdots)}{P(\bm{s}_\mathrm{orig}|\cdots)}=(1-2s_t)\left(-\sum_j W_{tj}s_j - (1-2s_t)W_{tt}/2 + \frac{A}{\sigma^2}\sum_j \tilde G_{jt}\tilde y_j + \log\frac{q}{1-q}\right)
+\end{align}
+
 \end{document}
 
