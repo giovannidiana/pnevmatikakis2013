@@ -1,7 +1,9 @@
 library(MASS)
+library(ggplot2)
+library(gridExtra)
+library(cowplot)
 
 gamma=.9
-
 
 testpar = c(sigma2=.02,q=0.1,A=1.5,b=.2,c0=0.1)
 gen <- function(par,n){
@@ -14,14 +16,12 @@ gen <- function(par,n){
     V = gamma^(seq(0,n-1))
 
     res$y = par['c0']*V+par['A']*G%*%res$spikes + par['b'] + rnorm(n,0,sqrt(par['sigma2']))
+    res$par=par
 
     return(res)
 }
 
-r = gen(testpar,500)
-data=r$y
-niter = 100
-#gibbs_sampler <- function(data,niter=100){
+gibbs_sampler <- function(data,niter=100){
 
     # hyperparameters
     empirical_baseline.mean = mean(data[1:20])
@@ -97,16 +97,45 @@ niter = 100
     }
     cat("\n")
 
-#    return(list(par.dataframe,spikes.mat))
+    return(list(par=par.dataframe,spikes=spikes.mat))
 
 
 
-#} 
+} 
 
-
-compare <- function(){
-    prob_spikes = rowSums(spikes.mat[,(niter-20+1):niter])/20
-    plot(prob_spikes,type='l')
-    abline(v=seq(1,data.len)[r$spikes==1],col="red")
-}
+validation <- function(samples,gt,keep=20){
+    nsamples = ncol(samples$spikes)
+    prob_spikes = rowMeans(samples$spikes[,(nsamples-keep+1):nsamples])
+    time = 1:length(prob_spikes)
+    nspc = rowMeans(apply(samples$spikes[,(nsamples-keep+1):nsamples],2,cumsum))
+    df=data.frame(time=time,
+                  prob=prob_spikes,
+                  nspc=nspc,
+                  true_spikes=gt$spikes,
+                  Y=gt$y)
     
+    g_data=ggplot(df) + geom_line(aes(time,Y))+geom_vline(xintercept=time[gt$spikes==1],col="green")
+    g_prob_spike = ggplot(df)+geom_line(aes(time,prob),col="red")
+    g_nspc = ggplot(df)+geom_line(aes(time,nspc)) + geom_line(aes(time,cumsum(true_spikes)),col="green")
+
+    g = plot_grid(g_data,g_prob_spike,g_nspc,ncol=1,align="v")
+    plot(g)
+}
+
+gibbs.show <- function(samples,data,keep=20){
+    time = 1:length(prob_spikes)
+    nsamples = ncol(samples$spikes)
+    prob_spikes = rowMeans(samples$spikes[,(nsamples-keep+1):nsamples])
+    nspc = rowMeans(apply(samples$spikes[,(nsamples-keep+1):nsamples],2,cumsum))
+    df=data.frame(time=time,
+                  prob=prob_spikes,
+                  nspc=nspc,
+                  Y=gt$y)
+    
+    g_data=ggplot(df) + geom_line(aes(time,Y))
+    g_prob_spike = ggplot(df)+geom_line(aes(time,prob),col="red")
+    g_nspc = ggplot(df)+geom_line(aes(time,nspc)) 
+
+    g = plot_grid(g_data,g_prob_spike,g_nspc,ncol=1,align="v")
+    plot(g)
+}
