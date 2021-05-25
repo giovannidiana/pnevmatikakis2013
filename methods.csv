@@ -1,4 +1,4 @@
 ids,labels,parents
-A1,Bayesian-methods, 
+A1,Bayesian-methods,
 A2,Optimization-methods,
 A3,test2,A1
